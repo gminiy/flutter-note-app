@@ -1,0 +1,98 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_note_app/domain/util/note_order.dart';
+import 'package:flutter_note_app/presentation/add_edit_note/add_edit_note_screen.dart';
+import 'package:flutter_note_app/presentation/notes/components/note_item.dart';
+import 'package:flutter_note_app/presentation/notes/components/order_section.dart';
+import 'package:flutter_note_app/presentation/notes/notes_event.dart';
+import 'package:flutter_note_app/presentation/notes/notes_view_model.dart';
+import 'package:provider/provider.dart';
+
+class NotesScreen extends StatelessWidget {
+  const NotesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final viewModel = context.watch<NotesViewModel>();
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Your note',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 40,
+            )),
+        actions: [
+          IconButton(
+            onPressed: () {
+              viewModel.onEvent(const NotesEvent.toggleOrderSection());
+            },
+            icon: const Icon(Icons.sort, color: Colors.white),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          bool? isSaved = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddEditNoteScreen()),
+          );
+
+          if (isSaved != null && isSaved == true) {
+            viewModel.onEvent(const NotesEvent.loadNotes());
+          }
+        },
+        child: const Icon(Icons.add),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: ListView(children: [
+          AnimatedSwitcher(
+            duration: Duration(milliseconds: 300),
+            child: viewModel.state.isOrderSectionVisible
+                ? OrderSection(
+                    noteOrder: viewModel.state.noteOrder,
+                    onOrderChanged: (NoteOrder noteOrder) {
+                      viewModel.onEvent(NotesEvent.changeOrder(noteOrder));
+                    },
+                  )
+                : Container(),
+          ),
+          ...viewModel.state.notes
+              .map(
+                (note) => GestureDetector(
+                  onTap: () async {
+                    bool? isSaved = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AddEditNoteScreen(note: note),
+                      ),
+                    );
+
+                    if (isSaved != null && isSaved == true) {
+                      viewModel.onEvent(const NotesEvent.loadNotes());
+                    }
+                  },
+                  child: NoteItem(
+                    note: note,
+                    onDeleteTap: () {
+                      viewModel.onEvent(NotesEvent.deleteNote(note));
+                      final snackBar = SnackBar(
+                        content: const Text('노트가 삭제되었습니다.'),
+                        action: SnackBarAction(
+                          label: '취소',
+                          onPressed: () {
+                            viewModel.onEvent(const NotesEvent.restoreNote());
+                          },
+                        ),
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+                    },
+                  ),
+                ),
+              )
+              .toList(),
+        ]),
+      ),
+    );
+  }
+}
